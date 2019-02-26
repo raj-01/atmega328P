@@ -49,33 +49,41 @@ uint8_t num_ovf = 0 ;
 uint8_t data ; 
 
 void init_timer1(){
-
-	//setting ICR1 bits for capturing rising edge 
-	TCCR1B |= ( 1<<ICES1 ) ;
-	// enbling input capture icr1 interrupt vector 
-	TIMSK1 |= (1<<ICIE1);
 	//enabling timer overflow interrpt vector 
 	TIMSK1 |= (1<TOIE1);
-	//setting prescalar value to 64 
-	TCCR1B|=(1<<CS02)|(0<<CS01)|(1<<CS00);
+	//setting prescalar value to 256 
+	TCCR1B|=(1<<CS02)|(0<<CS01)|(0<<CS00);
 	// setting global interupt 
 	sei() ; 
 }
 
-ISR( TIMER1_CAPT_vect ){
-			future_count = ICR1 ; 
-			// changing cpature on falling edge by setting TCCR1B = 0 
-			TCCR1B &= ~(1<<ICES1);
-			// desabling the input capture interupt 
-			TIMSK1 &= ~(1<<ICIE1);
-			// making data ready flag = true 
-			is_data_reddy = 1 ; 
-			ovf_enable = 1 ; 
-			printf("\n yeah i am in input capture = %u", data );
-			printf("\nunsigned int = %u",( future_count - past_count) );
-			past_count = future_count ;
-				
+void init_int0_int1(){
+	//enabling external interupt using general interrupt control register( GICR)
+	EIMSK = (1<<INT1)|( 1<<INT0) ; 
+	//Configuring the type = bothh rising and falling edge in MCU control reg
+	EICRA = ( 0<< ISC01)|( 1<<ISC00) ;  // FOR INT0 
+	EICRA = ( 0<< ISC11)|( 1<<ISC00) ;  // FOR INT1
+	sei() ;
 }
+
+ISR( INT0_vect){
+	future_count = TCNT1 ; 
+	// making data ready flag = true 
+	is_data_reddy = 1 ;
+	ovf_enable = 1 ;
+	printf("\n yeah i am in int0 = %u", data );
+}
+
+ISR( INT1_vect){
+	future_count = TCNT1 ; 
+	// making data ready flag = true 
+	is_data_reddy = 1 ;
+	ovf_enable = 1 ;
+	printf("\n yeah i am in int1 = %u", data );
+
+}
+
+
 
 ISR( TIMER1_OVF_vect ){
 	if( ovf_enable == 1 ){
@@ -85,18 +93,18 @@ ISR( TIMER1_OVF_vect ){
 }
 
 
-// setting variables for pwm 
+
 uint8_t dir_rotation = 1 ;  
 
 uint8_t turn = 0 ; 
 uint8_t count = 0 ; 
 
-// initialising 8 bit timer 
+
 void initTimer0(void) {
 /* must be /64 or more for ISR timing */
 				
-				TCCR0B |= (1 << WGM12) | (0 << CS01) | (1 << CS00);
-				OCR0A = 11 ; 
+				TCCR0B |= (1 << WGM12) | (1 << CS01) | (1 << CS00);
+				OCR0A = 101 ; 
 /* both output compare interrupts */
 				TIMSK0 |= (1 << OCIE0A ) ;
 				//TIMSK0 |= (1 << TOIE0);
@@ -104,32 +112,24 @@ void initTimer0(void) {
 				sei();
 }
 
-
-
 ISR(TIMER0_COMPA_vect) {
-			printf("\n this is tmer0 = %u", data );
+			
 			count++ ; 
-			
-			
 			if(count == 2 ){  
 				
 				PORTD |= _BV(PORTD5);
 				count = 0 ; 
 				//_delay_ms(1000);
-				OCR0A = 20 ; 
-
+				OCR0A = 15 ; 
 			}
 				
 			if( count == 1 ){
 				PORTD &= ~ _BV(PORTD5);	
 				OCR0A = 235; 
+
 				//_delay_ms(1000);
-				// enabling the timer1 input capture interupt
-				TIMSK1 |= (1<<ICIE1);
-				
 				}
 }
-
 
 
 int main(){
@@ -138,20 +138,19 @@ int main(){
 	// initialising usart 
 	usart__init( ) ;
 	//initilising timer
-	init_timer1() ;
+	init_timer1() ; 
 
-	/* set pin 5 of PORTD for output*/
+	//set pin5 of portD for output 
+
 	DDRD = 0b11111111;
 	if( dir_rotation == 1){
-			PORTD  |=  _BV(PORTD4);
+		PORTD  |=  _BV(PORTD4);
 	}
 	else{
 		PORTD  &=  ~_BV(PORTD5);
 	}
- 
  	PORTD  |=  _BV(PORTD5);
- 	initTimer0() ; 
-
+ 	initTimer0() ;     // initialising timer0 for pwm at pin 5 PORTD5 
 	scanf("%c",&data);
 	printf("\n yeah i am in main = %u", data );
 
